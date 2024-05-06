@@ -60,9 +60,9 @@ const SubmittedData = ({ footerRows }) => {
   const allRows = Array.isArray(footerRows) ? [...submittedData, ...footerRows] : submittedData
 
   return (
-    <div style={{ height: '100vh', width: '100%' }}>
-      <h2>Submitted Data</h2>
-      <div style={{ height: '90%', width: '100%' }}>
+    <div>
+      <h2 className="text-2xl py-5 border-b border-gray-700">Submitted Data</h2>
+      <div>
         <DataGrid rows={allRows} columns={columns} />
       </div>
     </div>
