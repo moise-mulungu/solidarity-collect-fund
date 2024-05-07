@@ -24,15 +24,17 @@ const randomTraderName = () => {
 }
 
 // Function to generate a random ID
-// const randomId = () => {
-//   return Math.random().toString(36).substring(7)
-// }
-
 const randomId = () => {
-  const timestamp = Date.now().toString(36)
-  const randomString = Math.random().toString(36).substring(2, 15)
-  return timestamp + randomString
+  const id = Math.random().toString(36).substring(7)
+  console.log('Generated ID:', id)
+  return id
 }
+
+// const randomId = () => {
+//   const timestamp = Date.now().toString(36)
+//   const randomString = Math.random().toString(36).substring(2, 15)
+//   return timestamp + randomString
+// }
 
 const initialRows = [
   {
@@ -51,7 +53,7 @@ const initialRows = [
 ]
 
 const EditToolbar = (props) => {
-  const { setRows, setRowModesModel, setSubmittedData, rows, footerRows } = props
+  const { setRows, setRowModesModel, setSubmittedData, rows, footerRows, rowModesModel } = props
 
   const handleClick = () => {
     const id = randomId()
@@ -68,14 +70,16 @@ const EditToolbar = (props) => {
       isNew: true,
     }
 
-    // Update the rows state by adding the new row
-    setRows((oldRows) => [...oldRows, newRow])
+    // Create a new array of rows that includes the new row
+    const newRows = [...rows, newRow]
+    setRows(newRows)
 
-    // Update the rowModesModel state to set the new row in edit mode
-    setRowModesModel((oldModel) => ({
-      ...oldModel,
+    // Create a new rowModesModel that includes the new row's mode
+    const newRowModesModel = {
+      ...rowModesModel,
       [id]: { mode: GridRowModes.Edit, fieldToFocus: 'memberNames' },
-    }))
+    }
+    setRowModesModel(newRowModesModel)
   }
 
   const handleSubmitClick = async () => {
@@ -154,7 +158,14 @@ export default function WeeklyMeetingForm() {
   }
 
   const handleDeleteClick = (id) => () => {
-    setRows(rows.filter((row) => row.id !== id))
+    setTimeout(() => {
+      setRows(rows.filter((row) => row.id !== id))
+
+      // Also remove the row from the rowModesModel state
+      const newRowModesModel = { ...rowModesModel }
+      delete newRowModesModel[id]
+      setRowModesModel(newRowModesModel)
+    })
   }
 
   const handleCancelClick = (id) => () => {
@@ -178,12 +189,6 @@ export default function WeeklyMeetingForm() {
   const handleRowModesModelChange = (newRowModesModel) => {
     setRowModesModel(newRowModesModel)
   }
-
-  // // Calculate available cash
-  // const totalAmount = grandTotal.amount - columnTotals.fine // Total amount (excluding fines)
-
-  // const availableCash = totalAmount - columnTotals.amount // Available cash is total amount minus the amount column
-  // console.log('value of available cash:', availableCash)
 
   const columns = [
     {
@@ -469,6 +474,8 @@ export default function WeeklyMeetingForm() {
                 rows={rows}
                 footerRows={footerRows}
                 setSubmittedData={setSubmittedData}
+                rowModesModel={rowModesModel}
+                setRowModesModel={setRowModesModel}
               />
             ),
           }}
