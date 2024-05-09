@@ -4,7 +4,7 @@ import { collection, getDocs } from 'firebase/firestore'
 import { db } from './firebase' // Import your Firebase app instance
 import { BounceLoader } from 'react-spinners'
 
-const SubmittedData = ({ footerRows }) => {
+const SubmittedData = ({ footerRowsRef }) => {
   const [loading, setLoading] = useState(true)
   const [submittedData, setSubmittedData] = useState([])
 
@@ -13,10 +13,25 @@ const SubmittedData = ({ footerRows }) => {
       try {
         const meetingsRef = collection(db, 'meetings')
         const querySnapshot = await getDocs(meetingsRef)
-        const data = querySnapshot.docs.map((doc) => ({
-          id: doc.id,
-          ...doc.data(),
-        }))
+        const data = querySnapshot.docs.map((doc, index) => {
+          const docData = doc.data()
+          return {
+            id: index + 1, // Use index as id
+            memberNames: docData.memberNames,
+            joinDate: docData.joinDate,
+            share: docData.share,
+            totalShare: docData.totalShare, // assuming totalShare is a field in your document
+          }
+        })
+
+        // Add a new row for Dates
+        data.push({
+          id: 'Dates',
+          memberNames: '',
+          joinDate: '', // You can put any value you want here
+          share: '',
+          totalShare: '',
+        })
         setSubmittedData(data)
         setLoading(false)
       } catch (error) {
@@ -43,21 +58,22 @@ const SubmittedData = ({ footerRows }) => {
     )
   }
 
+  // Update columns
   const columns = [
+    { field: 'id', headerName: 'Number' },
     { field: 'memberNames', headerName: 'Member Names' },
-    { field: 'share', headerName: 'Share' },
-    { field: 'amount', headerName: 'Amount' },
-    { field: 'solidarity', headerName: 'Solidarity' },
-    { field: 'age', headerName: 'Age' },
-    { field: 'assistantFund', headerName: 'Assistant Fund' },
-    { field: 'assistantAmount', headerName: 'Assistant Amount' },
-    { field: 'fine', headerName: 'Fine' },
     { field: 'joinDate', headerName: 'Join date' },
-    { field: 'role', headerName: 'Department' },
+    { field: 'share', headerName: 'Share' },
+    { field: 'totalShare', headerName: 'Total Share' },
   ]
 
-  // Concatenate submittedData with footerRows
-  const allRows = Array.isArray(footerRows) ? [...submittedData, ...footerRows] : submittedData
+  // Concatenate submittedData with footerRowsRef
+  const allRows = Array.isArray(footerRowsRef?.current)
+    ? [...submittedData, ...footerRowsRef?.current]
+    : submittedData
+
+  console.log('all rows:', allRows)
+  console.log('footer rows:', footerRowsRef)
 
   return (
     <div>

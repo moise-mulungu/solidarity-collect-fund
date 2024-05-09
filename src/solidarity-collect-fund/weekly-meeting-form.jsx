@@ -24,21 +24,19 @@ const randomTraderName = () => {
 }
 
 // Function to generate a random ID
-const randomId = () => {
-  const id = Math.random().toString(36).substring(7)
-  console.log('Generated ID:', id)
-  return id
-}
-
 // const randomId = () => {
 //   const timestamp = Date.now().toString(36)
 //   const randomString = Math.random().toString(36).substring(2, 15)
 //   return timestamp + randomString
 // }
 
+const randomId = () => {
+  return Math.random().toString(36).substring(7)
+}
+
 const initialRows = [
   {
-    id: randomId(),
+    id: randomId(), // Generate ID for the initial row
     memberNames: randomTraderName(),
     share: 0,
     amount: 0,
@@ -52,40 +50,45 @@ const initialRows = [
   },
 ]
 
-const EditToolbar = (props) => {
-  const { setRows, setRowModesModel, setSubmittedData, rows, footerRows, rowModesModel } = props
+const EditToolbar = ({ footerRowsRef, ...props }) => {
+  const { setRows, setRowModesModel, setSubmittedData, rows } = props
+  const [newRowId, setNewRowId] = React.useState(null)
 
   const handleClick = () => {
     const id = randomId()
-    const newRow = {
-      id,
-      memberNames: '',
-      share: '',
-      amount: '',
-      solidarity: '',
-      age: '',
-      assistantFund: '',
-      assistantAmount: '',
-      fine: '',
-      isNew: true,
-    }
-
-    // Create a new array of rows that includes the new row
-    const newRows = [...rows, newRow]
-    setRows(newRows)
-
-    // Create a new rowModesModel that includes the new row's mode
-    const newRowModesModel = {
-      ...rowModesModel,
-      [id]: { mode: GridRowModes.Edit, fieldToFocus: 'memberNames' },
-    }
-    setRowModesModel(newRowModesModel)
+    setNewRowId(id) // Set the new row ID
+    setRows((oldRows) => [
+      ...oldRows,
+      {
+        id,
+        memberNames: '',
+        share: '',
+        amount: '',
+        solidarity: '',
+        age: '',
+        assistantFund: '',
+        assistantAmount: '',
+        fine: '',
+        isNew: true,
+      },
+    ])
   }
+
+  React.useEffect(() => {
+    if (newRowId) {
+      setRowModesModel((oldModel) => ({
+        ...oldModel,
+        [newRowId]: { mode: GridRowModes.Edit, fieldToFocus: 'memberNames' },
+      }))
+      setNewRowId(null) // Reset the new row ID
+    }
+  }, [newRowId, setRowModesModel])
 
   const handleSubmitClick = async () => {
     try {
-      let dataToSubmit = rows.map((row) => ({
-        id: randomId(), // Generate unique id for each row
+      // Use existing IDs from grid rows to maintain consistency
+      const dataToSubmit = rows.map((row) => ({
+        id: row.id, // Use existing ID
         memberNames: row.memberNames,
         share: row.share,
         amount: row.amount,
@@ -103,7 +106,7 @@ const EditToolbar = (props) => {
       // Create a new object that includes all the rows and footerRows
       const dataObject = {
         rows: dataToSubmit,
-        footerRows,
+        footerRows: footerRowsRef.current,
       }
 
       const meetingsRef = collection(db, 'meetings')
@@ -142,6 +145,7 @@ export default function WeeklyMeetingForm() {
   const [submittedData, setSubmittedData] = React.useState([])
   const [processedData, setProcessedData] = React.useState([])
   const [gridRows, setGridRows] = React.useState([])
+  const [flattenedData, setFlattenedData] = React.useState([])
 
   const handleRowEditStop = (params, event) => {
     if (params.reason === GridRowEditStopReasons.rowFocusOut) {
@@ -158,14 +162,7 @@ export default function WeeklyMeetingForm() {
   }
 
   const handleDeleteClick = (id) => () => {
-    setTimeout(() => {
-      setRows(rows.filter((row) => row.id !== id))
-
-      // Also remove the row from the rowModesModel state
-      const newRowModesModel = { ...rowModesModel }
-      delete newRowModesModel[id]
-      setRowModesModel(newRowModesModel)
-    })
+    setRows(rows.filter((row) => row.id !== id))
   }
 
   const handleCancelClick = (id) => () => {
@@ -179,6 +176,11 @@ export default function WeeklyMeetingForm() {
       setRows(rows.filter((row) => row.id !== id))
     }
   }
+
+  // This useEffect will run whenever 'rows' changes and update 'submittedData' to match the current state of 'rows'.
+  React.useEffect(() => {
+    setSubmittedData(rows)
+  }, [rows])
 
   const processRowUpdate = (newRow) => {
     const updatedRow = { ...newRow, isNew: false }
@@ -397,7 +399,7 @@ export default function WeeklyMeetingForm() {
   }
 
   let rowsWithFooter = [] // Declare outside the fetchPreviousSubmissionTotals.then block
-  let footerRows = [] // Declare outside the fetchPreviousSubmissionTotals.then block
+  const footerRowsRef = React.useRef([]) // Use useRef to create a mutable variable // Declare outside the fetchPreviousSubmissionTotals.then block
   // Fetch previous submission totals
   React.useEffect(() => {
     fetchPreviousSubmissionTotals().then((previousSubmissionTotals) => {
@@ -433,17 +435,35 @@ export default function WeeklyMeetingForm() {
       const availableCash = totalAmount - columnTotals.amount // Available cash is total amount minus the amount column
       console.log('value of available cash:', availableCash)
 
-      const footerRows = [
+      footerRowsRef.current = [
         { id: 'weeklyTotal', memberNames: 'Weekly Total', ...columnTotals },
         { id: 'grandTotal', memberNames: 'Grand Total', ...grandTotal },
         { id: 'availableCash', memberNames: 'Available Cash', total: availableCash },
       ]
 
       // Add footer rows to the rows array
-      rowsWithFooter = rows.concat(footerRows)
+      rowsWithFooter = rows.concat(footerRowsRef.current)
       setGridRows(rowsWithFooter) // Update the state with the new rows including footer
     })
-  }, [rows]) // Empty dependency array ensures the effect runs only once after initial render
+  }, [rows, submittedData]) // Empty dependency array ensures the effect runs only once after initial render
+
+  React.useEffect(() => {
+    const flattenData = () => {
+      const flattenedRows = submittedData.reduce((accumulator, currentValue) => {
+        if (currentValue.rows) {
+          return [...accumulator, ...currentValue.rows]
+        } else {
+          return [...accumulator, currentValue]
+        }
+      }, [])
+      setFlattenedData(flattenedRows)
+    }
+
+    if (submittedData.length > 0) {
+      flattenData()
+      // setLoading(false);
+    }
+  }, [submittedData])
 
   return (
     <Box
@@ -461,6 +481,7 @@ export default function WeeklyMeetingForm() {
       {gridRows.length > 0 && (
         <DataGrid
           rows={gridRows}
+          // rows={rowsWithFooter}
           columns={columns}
           editMode="row"
           rowModesModel={rowModesModel}
@@ -472,10 +493,10 @@ export default function WeeklyMeetingForm() {
               <EditToolbar
                 {...props}
                 rows={rows}
-                footerRows={footerRows}
+                footerRowsRef={footerRowsRef}
                 setSubmittedData={setSubmittedData}
-                rowModesModel={rowModesModel}
-                setRowModesModel={setRowModesModel}
+                // rowModesModel={rowModesModel}
+                // setRowModesModel={setRowModesModel}
               />
             ),
           }}
@@ -491,8 +512,8 @@ export default function WeeklyMeetingForm() {
         (
           <div>
             <SubmittedData
-              submittedData={submittedData}
-              footerRows={footerRows}
+              submittedData={flattenedData}
+              footerRowsRef={footerRowsRef}
               submittedColumns={submittedColumns}
             />
           </div>
