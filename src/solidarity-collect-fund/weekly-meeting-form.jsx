@@ -1,5 +1,5 @@
 import * as React from 'react'
-import { collection, addDoc } from 'firebase/firestore'
+import { collection, addDoc, getDocs } from 'firebase/firestore'
 import { db } from './firebase'
 import Box from '@mui/material/Box'
 import Button from '@mui/material/Button'
@@ -8,7 +8,6 @@ import EditIcon from '@mui/icons-material/Edit'
 import DeleteIcon from '@mui/icons-material/DeleteOutlined'
 import SaveIcon from '@mui/icons-material/Save'
 import CancelIcon from '@mui/icons-material/Close'
-// import { ListItem, ListItemText, List } from '@mui/material'
 import {
   DataGrid,
   GridToolbarContainer,
@@ -19,41 +18,25 @@ import {
 
 import SubmittedData from './submitted-data'
 
-// const roles = ['Excellent', 'Good', 'Bad']
-
 // Function to generate a random trader name
 const randomTraderName = () => {
-  // Replace this with your custom implementation to generate a random trader name
-  // Example:
   return ''
 }
 
 // Function to generate a random ID
+// const randomId = () => {
+//   const timestamp = Date.now().toString(36)
+//   const randomString = Math.random().toString(36).substring(2, 15)
+//   return timestamp + randomString
+// }
+
 const randomId = () => {
-  // Replace this with your custom implementation to generate a random ID
-  // Example:
   return Math.random().toString(36).substring(7)
 }
 
-// Function to generate a random date
-// const randomCreatedDate = () => {
-//   // Replace this with your custom implementation to generate a random date
-//   // Example:
-//   return new Date().toISOString().substring(0, 10)
-// }
-
-// const randomRole = () => {
-//   return roles[Math.floor(Math.random() * roles.length)]
-// }
-
-// const inDollars = (value) => {
-//   // Format the value to have 2 decimal places and prepend a dollar sign
-//   return `$${Number(value).toFixed(2)}`
-// }
-
 const initialRows = [
   {
-    id: randomId(),
+    id: randomId(), // Generate ID for the initial row
     memberNames: randomTraderName(),
     share: 0,
     amount: 0,
@@ -62,17 +45,18 @@ const initialRows = [
     assistantAmount: 0,
     fine: 0,
     age: null,
-    // joinDate: new Date(),
     joinDate: new Date().toISOString(),
     role: '',
   },
 ]
 
-const EditToolbar = (props) => {
+const EditToolbar = ({ footerRowsRef, ...props }) => {
   const { setRows, setRowModesModel, setSubmittedData, rows } = props
+  const [newRowId, setNewRowId] = React.useState(null)
 
   const handleClick = () => {
     const id = randomId()
+    setNewRowId(id) // Set the new row ID
     setRows((oldRows) => [
       ...oldRows,
       {
@@ -88,16 +72,23 @@ const EditToolbar = (props) => {
         isNew: true,
       },
     ])
-    setRowModesModel((oldModel) => ({
-      ...oldModel,
-      [id]: { mode: GridRowModes.Edit, fieldToFocus: 'memberNames' },
-    }))
   }
+
+  React.useEffect(() => {
+    if (newRowId) {
+      setRowModesModel((oldModel) => ({
+        ...oldModel,
+        [newRowId]: { mode: GridRowModes.Edit, fieldToFocus: 'memberNames' },
+      }))
+      setNewRowId(null) // Reset the new row ID
+    }
+  }, [newRowId, setRowModesModel])
 
   const handleSubmitClick = async () => {
     try {
-      const dataToSubmit = rows.map((row, index) => ({
-        id: index + 1, // Generate unique id for each row
+      // Use existing IDs from grid rows to maintain consistency
+      const dataToSubmit = rows.map((row) => ({
+        id: row.id, // Use existing ID
         memberNames: row.memberNames,
         share: row.share,
         amount: row.amount,
@@ -112,12 +103,16 @@ const EditToolbar = (props) => {
 
       console.log('Data to submit:', dataToSubmit)
 
+      // Create a new object that includes all the rows and footerRows
+      const dataObject = {
+        rows: dataToSubmit,
+        footerRows: footerRowsRef.current,
+      }
+
       const meetingsRef = collection(db, 'meetings')
 
-      // Loop through each row and add it as a document to the "meetings" collection
-      dataToSubmit.forEach(async (data) => {
-        await addDoc(meetingsRef, data)
-      })
+      // Add the dataObject as a single document to the "meetings" collection
+      await addDoc(meetingsRef, dataObject)
 
       setSubmittedData(dataToSubmit)
     } catch (error) {
@@ -149,6 +144,8 @@ export default function WeeklyMeetingForm() {
   const [rowModesModel, setRowModesModel] = React.useState({})
   const [submittedData, setSubmittedData] = React.useState([])
   const [processedData, setProcessedData] = React.useState([])
+  const [gridRows, setGridRows] = React.useState([])
+  const [flattenedData, setFlattenedData] = React.useState([])
 
   const handleRowEditStop = (params, event) => {
     if (params.reason === GridRowEditStopReasons.rowFocusOut) {
@@ -180,6 +177,11 @@ export default function WeeklyMeetingForm() {
     }
   }
 
+  // This useEffect will run whenever 'rows' changes and update 'submittedData' to match the current state of 'rows'.
+  React.useEffect(() => {
+    setSubmittedData(rows)
+  }, [rows])
+
   const processRowUpdate = (newRow) => {
     const updatedRow = { ...newRow, isNew: false }
     setRows(rows.map((row) => (row.id === newRow.id ? updatedRow : row)))
@@ -190,29 +192,14 @@ export default function WeeklyMeetingForm() {
     setRowModesModel(newRowModesModel)
   }
 
-  // Function to calculate the total for a specific column
-  const calculateColumnTotal = (columnName) => {
-    return rows.reduce((total, row) => total + (row[columnName] || 0), 0)
-  }
-
-  // Calculate the total for each column
-  const columnTotals = {
-    share: calculateColumnTotal('share'),
-    amount: calculateColumnTotal('amount'),
-    solidarity: calculateColumnTotal('solidarity'),
-    age: calculateColumnTotal('age'),
-    assistantFund: calculateColumnTotal('assistantFund'),
-    assistantAmount: calculateColumnTotal('assistantAmount'),
-    fine: calculateColumnTotal('fine'),
-  }
-
-  // Calculate the grand total
-  const grandTotal = Object.values(columnTotals).reduce((acc, curr) => acc + curr, 0)
-  // Calculate available cash (replace this with your actual logic)
-  // const availableCash = grandTotal * 0.5 // Example logic, replace with actual logic
-
   const columns = [
-    { field: 'memberNames', headerName: 'Member Names', width: 180, editable: true },
+    {
+      field: 'memberNames',
+      headerName: 'Member Names',
+      width: 180,
+      editable: true,
+      style: { borderRight: '1px solid grey' },
+    },
     {
       field: 'share',
       headerName: 'Share',
@@ -221,6 +208,7 @@ export default function WeeklyMeetingForm() {
       align: 'left',
       headerAlign: 'left',
       editable: true,
+      style: { borderRight: '1px solid grey' },
     },
     {
       field: 'amount',
@@ -373,30 +361,109 @@ export default function WeeklyMeetingForm() {
     setProcessedData(processedData)
   }, [submittedData])
 
-  // React.useEffect(
-  //   (footerRows) => {
-  //     const processedData =
-  //       submittedData?.map((data, index) => ({
-  //         id: index,
-  //         ...data,
-  //       })) || []
+  // Function to fetch previous submission totals from Firebase
+  const fetchPreviousSubmissionTotals = async () => {
+    try {
+      const meetingsRef = collection(db, 'meetings')
+      const snapshot = await getDocs(meetingsRef)
 
-  //     // Add the new rows to the processedData array
-  //     const rowsWithFooter = processedData.concat(footerRows)
+      // Initialize an object to hold previous submission totals
+      const previousTotals = {
+        share: 0,
+        amount: 0,
+        solidarity: 0,
+        age: 0,
+        assistantFund: 0,
+        assistantAmount: 0,
+        fine: 0,
+      }
 
-  //     setProcessedData(rowsWithFooter)
-  //   },
-  //   [submittedData, footerRows]
-  // )
+      // Iterate through each document in the "meetings" collection
+      snapshot.forEach((doc) => {
+        const data = doc.data()
+        // Sum up the values for each column
+        Object.keys(previousTotals).forEach((key) => {
+          if (data.rows) {
+            data.rows.forEach((row) => {
+              previousTotals[key] += row[key] || 0
+            })
+          }
+        })
+      })
 
-  const footerRows = [
-    { id: 'weeklyTotal', memberNames: 'Weekly Total', ...columnTotals },
-    { id: 'grandTotal', memberNames: 'Grand Total', ...grandTotal },
-    { id: 'availableCash', memberNames: 'Available Cash', ...columnTotals },
-  ]
+      return previousTotals
+    } catch (error) {
+      console.error('Error fetching previous submission totals:', error)
+      return {} // Return empty object if there's an error
+    }
+  }
 
-  // Add footer rows to the rows array
-  const rowsWithFooter = rows.concat(footerRows)
+  let rowsWithFooter = [] // Declare outside the fetchPreviousSubmissionTotals.then block
+  const footerRowsRef = React.useRef([]) // Use useRef to create a mutable variable // Declare outside the fetchPreviousSubmissionTotals.then block
+  // Fetch previous submission totals
+  React.useEffect(() => {
+    fetchPreviousSubmissionTotals().then((previousSubmissionTotals) => {
+      // Now you can use previousSubmissionTotals to calculate the grandTotal
+
+      // Function to calculate the total for a specific column
+      const calculateColumnTotal = (columnName) => {
+        return rows.reduce((total, row) => total + (row[columnName] || 0), 0)
+      }
+
+      // Calculate the total for each column
+      const columnTotals = {
+        share: calculateColumnTotal('share'),
+        amount: calculateColumnTotal('amount'),
+        solidarity: calculateColumnTotal('solidarity'),
+        age: calculateColumnTotal('age'),
+        assistantFund: calculateColumnTotal('assistantFund'),
+        assistantAmount: calculateColumnTotal('assistantAmount'),
+        fine: calculateColumnTotal('fine'),
+      }
+
+      // Calculate the grand total for each column
+      const grandTotal = {}
+      Object.keys(columnTotals).forEach((columnName) => {
+        // Sum up current submission and previous submissions for each column
+        grandTotal[columnName] =
+          calculateColumnTotal(columnName) + (previousSubmissionTotals[columnName] || 0)
+      })
+      console.log('value of grand total:', grandTotal)
+
+      // Calculate available cash
+      const totalAmount = grandTotal.amount - columnTotals.fine // Total amount (excluding fines)
+      const availableCash = totalAmount - columnTotals.amount // Available cash is total amount minus the amount column
+      console.log('value of available cash:', availableCash)
+
+      footerRowsRef.current = [
+        { id: 'weeklyTotal', memberNames: 'Weekly Total', ...columnTotals },
+        { id: 'grandTotal', memberNames: 'Grand Total', ...grandTotal },
+        { id: 'availableCash', memberNames: 'Available Cash', total: availableCash },
+      ]
+
+      // Add footer rows to the rows array
+      rowsWithFooter = rows.concat(footerRowsRef.current)
+      setGridRows(rowsWithFooter) // Update the state with the new rows including footer
+    })
+  }, [rows, submittedData]) // Empty dependency array ensures the effect runs only once after initial render
+
+  React.useEffect(() => {
+    const flattenData = () => {
+      const flattenedRows = submittedData.reduce((accumulator, currentValue) => {
+        if (currentValue.rows) {
+          return [...accumulator, ...currentValue.rows]
+        } else {
+          return [...accumulator, currentValue]
+        }
+      }, [])
+      setFlattenedData(flattenedRows)
+    }
+
+    if (submittedData.length > 0) {
+      flattenData()
+      // setLoading(false);
+    }
+  }, [submittedData])
 
   return (
     <Box
@@ -411,35 +478,46 @@ export default function WeeklyMeetingForm() {
         },
       }}
     >
-      <DataGrid
-        // rows={rows}
-        rows={rowsWithFooter}
-        columns={columns}
-        editMode="row"
-        rowModesModel={rowModesModel}
-        onRowModesModelChange={handleRowModesModelChange}
-        onRowEditStop={handleRowEditStop}
-        processRowUpdate={processRowUpdate}
-        slots={{
-          toolbar: (props) => (
-            <EditToolbar {...props} rows={rows} setSubmittedData={setSubmittedData} />
-          ),
-        }}
-        slotProps={{
-          toolbar: { setRows, setRowModesModel, submittedData, setSubmittedData },
-        }}
-      />
-
-      {submittedData && submittedData.length > 0 && (
-        <div>
-          <h2>Submitted Data</h2>
-          <SubmittedData
-            submittedData={submittedData}
-            footerRows={footerRows}
-            submittedColumns={submittedColumns}
-          />
-        </div>
+      {gridRows.length > 0 && (
+        <DataGrid
+          rows={gridRows}
+          // rows={rowsWithFooter}
+          columns={columns}
+          editMode="row"
+          rowModesModel={rowModesModel}
+          onRowModesModelChange={handleRowModesModelChange}
+          onRowEditStop={handleRowEditStop}
+          processRowUpdate={processRowUpdate}
+          slots={{
+            toolbar: (props) => (
+              <EditToolbar
+                {...props}
+                rows={rows}
+                footerRowsRef={footerRowsRef}
+                setSubmittedData={setSubmittedData}
+                // rowModesModel={rowModesModel}
+                // setRowModesModel={setRowModesModel}
+              />
+            ),
+          }}
+          slotProps={{
+            toolbar: { setRows, setRowModesModel, submittedData, setSubmittedData },
+          }}
+        />
       )}
+
+      {submittedData &&
+        submittedData.length > 0 &&
+        (console.log('value of submitted data:', submittedData),
+        (
+          <div>
+            <SubmittedData
+              submittedData={flattenedData}
+              footerRowsRef={footerRowsRef}
+              submittedColumns={submittedColumns}
+            />
+          </div>
+        ))}
     </Box>
   )
 }
