@@ -1,5 +1,5 @@
 import * as React from 'react'
-import { collection, addDoc, getDocs } from 'firebase/firestore'
+import { collection, addDoc, getDocs, doc, getDoc } from 'firebase/firestore'
 import { db } from './firebase'
 import Box from '@mui/material/Box'
 import Button from '@mui/material/Button'
@@ -16,19 +16,10 @@ import {
   GridRowEditStopReasons,
 } from '@mui/x-data-grid'
 
-import SubmittedData from './submitted-data'
-
 // Function to generate a random trader name
 const randomTraderName = () => {
   return ''
 }
-
-// Function to generate a random ID
-// const randomId = () => {
-//   const timestamp = Date.now().toString(36)
-//   const randomString = Math.random().toString(36).substring(2, 15)
-//   return timestamp + randomString
-// }
 
 const randomId = () => {
   return Math.random().toString(36).substring(7)
@@ -74,6 +65,20 @@ const EditToolbar = ({ footerRowsRef, ...props }) => {
     ])
   }
 
+  const fetchCollectorSolidarityName = async (collectorUid) => {
+    const collectorRef = doc(db, 'collectors', collectorUid)
+    const collectorSnap = await getDoc(collectorRef)
+
+    if (collectorSnap.exists()) {
+      const collectorSolidarityName = collectorSnap.data().solidarityName
+      console.log('collect solidarity name:', collectorSolidarityName)
+      return collectorSolidarityName
+    } else {
+      console.log('No such collector!')
+      return ''
+    }
+  }
+
   React.useEffect(() => {
     if (newRowId) {
       setRowModesModel((oldModel) => ({
@@ -86,6 +91,10 @@ const EditToolbar = ({ footerRowsRef, ...props }) => {
 
   const handleSubmitClick = async () => {
     try {
+      // Fetch the solidarityName for the collector
+      const solidarityName = await fetchCollectorSolidarityName('user.uid') // Replace with actual collector UID
+      console.log('fetched solidarity name:', solidarityName)
+
       // Use existing IDs from grid rows to maintain consistency
       const dataToSubmit = rows.map((row) => ({
         id: row.id, // Use existing ID
@@ -99,6 +108,7 @@ const EditToolbar = ({ footerRowsRef, ...props }) => {
         fine: row.fine,
         joinDate: new Date(row.joinDate).toISOString(), // Convert date to ISO string
         role: row.role,
+        solidarityName, // Add the solidarityName field
       }))
 
       console.log('Data to submit:', dataToSubmit)
@@ -107,6 +117,7 @@ const EditToolbar = ({ footerRowsRef, ...props }) => {
       const dataObject = {
         rows: dataToSubmit,
         footerRows: footerRowsRef.current,
+        solidarityName, // Add the solidarityName field at the top level
       }
 
       const meetingsRef = collection(db, 'meetings')
@@ -399,7 +410,7 @@ export default function WeeklyMeetingForm() {
   }
 
   let rowsWithFooter = [] // Declare outside the fetchPreviousSubmissionTotals.then block
-  const footerRowsRef = React.useRef([]) // Use useRef to create a mutable variable // Declare outside the fetchPreviousSubmissionTotals.then block
+  const footerRowsRef = React.useRef([])
   // Fetch previous submission totals
   React.useEffect(() => {
     fetchPreviousSubmissionTotals().then((previousSubmissionTotals) => {
@@ -431,14 +442,18 @@ export default function WeeklyMeetingForm() {
       console.log('value of grand total:', grandTotal)
 
       // Calculate available cash
-      const totalAmount = grandTotal.amount - columnTotals.fine // Total amount (excluding fines)
-      const availableCash = totalAmount - columnTotals.amount // Available cash is total amount minus the amount column
+      // const totalAmount = grandTotal.amount - columnTotals.fine // Total amount (excluding fines)
+      // console.log('total amount', totalAmount)
+      const availableCash = grandTotal.amount - grandTotal.fine // Available cash is total amount minus the amount column
+      // columnsTotal.amount - columnsTotal.fine
+      // const restOfFine = columnTotals.amount - columnTotals.fine
+      console.log('total of the fine columns:', grandTotal.fine)
       console.log('value of available cash:', availableCash)
 
       footerRowsRef.current = [
         { id: 'weeklyTotal', memberNames: 'Weekly Total', ...columnTotals },
         { id: 'grandTotal', memberNames: 'Grand Total', ...grandTotal },
-        { id: 'availableCash', memberNames: 'Available Cash', total: availableCash },
+        { id: 'availableCash', memberNames: 'Available Cash', amount: availableCash },
       ]
 
       // Add footer rows to the rows array
@@ -506,18 +521,11 @@ export default function WeeklyMeetingForm() {
         />
       )}
 
-      {submittedData &&
-        submittedData.length > 0 &&
-        (console.log('value of submitted data:', submittedData),
-        (
-          <div>
-            <SubmittedData
-              submittedData={flattenedData}
-              footerRowsRef={footerRowsRef}
-              submittedColumns={submittedColumns}
-            />
-          </div>
-        ))}
+      {submittedData && submittedData.length > 0 && (
+        <div style={{ height: 400, width: '100%' }}>
+          <DataGrid rows={submittedData} columns={columns} pageSize={5} />
+        </div>
+      )}
     </Box>
   )
 }

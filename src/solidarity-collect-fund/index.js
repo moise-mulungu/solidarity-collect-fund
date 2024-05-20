@@ -10,15 +10,19 @@ export default function SolidarityCollectFund() {
   const [isCollectorAuthenticated, setIsCollectorAuthenticated] = useState(false)
   const [isAdminAuthenticated, setIsAdminAuthenticated] = useState(false)
   const [selectedAuthType, setSelectedAuthType] = useState(null)
+  const [collectorUid, setCollectorUid] = useState('')
 
   const handleAdminAuthentication = (authStatus, userRole) => {
     setIsAuthenticated(authStatus)
     setIsAdminAuthenticated(authStatus && userRole === 'admin')
   }
 
-  const handleCollectorAuthentication = (authStatus) => {
-    setIsAuthenticated(authStatus)
-    setIsCollectorAuthenticated(authStatus)
+  const handleCollectorFormSubmit = (authStatus, userRole, uid) => {
+    if (authStatus && userRole === 'collector') {
+      setIsAuthenticated(authStatus)
+      setIsCollectorAuthenticated(authStatus)
+      setCollectorUid(uid)
+    }
   }
 
   const handleAdminClick = () => {
@@ -35,19 +39,17 @@ export default function SolidarityCollectFund() {
       {!isAuthenticated && (
         <div className="flex justify-between mb-2">
           <button
-            href="#"
             onClick={handleAdminClick}
-            className="text-blue-500 hover:text-red-500 cursor-pointer"
+            className="bg-green-500 hover:bg-red-500 text-white font-bold py-2 px-4 rounded"
           >
             Admin Authentication
-            </button>
+          </button>
           <button
-            href="#"
             onClick={handleCollectorClick}
-            className="text-blue-500 hover:text-red-500 cursor-pointer"
+            className="bg-green-500 hover:bg-red-500 text-white font-bold py-2 px-4 rounded"
           >
             Collector Authentication
-            </button>
+          </button>
         </div>
       )}
 
@@ -56,12 +58,12 @@ export default function SolidarityCollectFund() {
       )}
 
       {selectedAuthType === 'collector' && !isCollectorAuthenticated && (
-        <CollectorAuthenticationForm onFormSubmit={handleCollectorAuthentication} />
+        <CollectorAuthenticationForm onFormSubmit={handleCollectorFormSubmit} />
       )}
 
       {isAdminAuthenticated && <SubmittedData />}
 
-      {isCollectorAuthenticated && <WeeklyMeetingForm />}
+      {isCollectorAuthenticated && <WeeklyMeetingForm collectorUid={collectorUid} />}
     </>
   )
 }
