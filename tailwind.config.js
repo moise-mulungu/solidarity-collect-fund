@@ -3,7 +3,11 @@ module.exports = {
   purge: ['./src/**/*.js', './src/**/*.jsx', './src/**/*.ts', './src/**/*.tsx'],
   content: [],
   theme: {
-    extend: {},
+    extend: {
+      backgroundImage: {
+        solidarity: "url('./solidarity.jpg')",
+      },
+    },
   },
   plugins: [],
 }

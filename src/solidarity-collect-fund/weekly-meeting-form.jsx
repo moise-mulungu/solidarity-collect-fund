@@ -1,5 +1,5 @@
 import * as React from 'react'
-import { collection, addDoc, getDocs, doc, getDoc } from 'firebase/firestore'
+import { collection, addDoc, getDocs, query, where } from 'firebase/firestore'
 import { db } from './firebase'
 import Box from '@mui/material/Box'
 import Button from '@mui/material/Button'
@@ -41,7 +41,7 @@ const initialRows = [
   },
 ]
 
-const EditToolbar = ({ footerRowsRef, ...props }) => {
+const EditToolbar = ({ footerRowsRef, collectorUid, ...props }) => {
   const { setRows, setRowModesModel, setSubmittedData, rows } = props
   const [newRowId, setNewRowId] = React.useState(null)
 
@@ -66,16 +66,32 @@ const EditToolbar = ({ footerRowsRef, ...props }) => {
   }
 
   const fetchCollectorSolidarityName = async (collectorUid) => {
-    const collectorRef = doc(db, 'collectors', collectorUid)
-    const collectorSnap = await getDoc(collectorRef)
+    if (!collectorUid) {
+      console.error('collectorUid is undefined or null')
+      return null
+    }
 
-    if (collectorSnap.exists()) {
-      const collectorSolidarityName = collectorSnap.data().solidarityName
-      console.log('collect solidarity name:', collectorSolidarityName)
+    const collectorsRef = collection(db, 'collectors')
+    const q = query(collectorsRef, where('uid', '==', collectorUid))
+
+    try {
+      const querySnapshot = await getDocs(q)
+      if (querySnapshot.empty) {
+        console.log('No such collector:', collectorUid)
+        return null
+      }
+
+      let collectorSolidarityName = null
+      querySnapshot.forEach((doc) => {
+        const collectorData = doc.data()
+        collectorSolidarityName = collectorData.solidarityName
+        console.log('Collector solidarity name:', collectorSolidarityName)
+      })
+
       return collectorSolidarityName
-    } else {
-      console.log('No such collector!')
-      return ''
+    } catch (error) {
+      console.error('Error fetching collector:', error)
+      throw error
     }
   }
 
@@ -92,7 +108,7 @@ const EditToolbar = ({ footerRowsRef, ...props }) => {
   const handleSubmitClick = async () => {
     try {
       // Fetch the solidarityName for the collector
-      const solidarityName = await fetchCollectorSolidarityName('user.uid') // Replace with actual collector UID
+      const solidarityName = await fetchCollectorSolidarityName(collectorUid) // Replace with actual collector UID
       console.log('fetched solidarity name:', solidarityName)
 
       // Use existing IDs from grid rows to maintain consistency
@@ -150,7 +166,7 @@ const EditToolbar = ({ footerRowsRef, ...props }) => {
   )
 }
 
-export default function WeeklyMeetingForm() {
+export default function WeeklyMeetingForm({ collectorUid }) {
   const [rows, setRows] = React.useState(initialRows)
   const [rowModesModel, setRowModesModel] = React.useState({})
   const [submittedData, setSubmittedData] = React.useState([])
@@ -439,16 +455,12 @@ export default function WeeklyMeetingForm() {
         grandTotal[columnName] =
           calculateColumnTotal(columnName) + (previousSubmissionTotals[columnName] || 0)
       })
-      console.log('value of grand total:', grandTotal)
+      // console.log('value of grand total:', grandTotal)
 
-      // Calculate available cash
-      // const totalAmount = grandTotal.amount - columnTotals.fine // Total amount (excluding fines)
-      // console.log('total amount', totalAmount)
       const availableCash = grandTotal.amount - grandTotal.fine // Available cash is total amount minus the amount column
-      // columnsTotal.amount - columnsTotal.fine
-      // const restOfFine = columnTotals.amount - columnTotals.fine
-      console.log('total of the fine columns:', grandTotal.fine)
-      console.log('value of available cash:', availableCash)
+
+      // console.log('total of the fine columns:', grandTotal.fine)
+      // console.log('value of available cash:', availableCash)
 
       footerRowsRef.current = [
         { id: 'weeklyTotal', memberNames: 'Weekly Total', ...columnTotals },
@@ -510,13 +522,14 @@ export default function WeeklyMeetingForm() {
                 rows={rows}
                 footerRowsRef={footerRowsRef}
                 setSubmittedData={setSubmittedData}
+                collectorUid={collectorUid}
                 // rowModesModel={rowModesModel}
                 // setRowModesModel={setRowModesModel}
               />
             ),
           }}
           slotProps={{
-            toolbar: { setRows, setRowModesModel, submittedData, setSubmittedData },
+            toolbar: { setRows, setRowModesModel, submittedData, setSubmittedData, collectorUid },
           }}
         />
       )}

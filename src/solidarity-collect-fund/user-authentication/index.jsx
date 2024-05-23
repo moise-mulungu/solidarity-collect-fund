@@ -37,7 +37,7 @@ export default function UserAuthentication({ onFormSubmit }) {
   }
 
   return (
-    <div>
+    <>
       {role === 'admin' && (
         <AdminAuthentication
           onFormSubmit={handleAdminAuth}
@@ -55,6 +55,6 @@ export default function UserAuthentication({ onFormSubmit }) {
       {!isAdminAuthenticated && (
         <AdminAuthentication onFormSubmit={handleAdminAuth} fetchUserRole={fetchUserRole} />
       )}
-    </div>
+    </>
   )
 }
