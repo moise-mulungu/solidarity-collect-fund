@@ -97,10 +97,14 @@ const SubmittedData = () => {
     const rows = data.reduce((acc, item) => {
       const member = item.memberNames
       if (!acc[member]) {
-        acc[member] = { id: Object.keys(acc).length + 1, memberName: member[0], shares: {} }
+        acc[member] = {
+          id: Object.keys(acc).length + 1,
+          memberName: member.length > 0 ? member[0] : '',
+          shares: {},
+        }
       }
       if (typeof item.share === 'number') {
-        acc[member].shares[`date_${item.joinDate}`] = item.share
+        acc[member].shares[item.joinDate] = item.share
       }
       return acc
     }, {})
@@ -117,21 +121,17 @@ const SubmittedData = () => {
     { field: 'id', headerName: 'N°', width: 70 },
     { field: 'memberName', headerName: 'MemberNames', width: 200 },
     ...dates.map((date) => ({
-      // field: date,
-      field: `date_${date}`,
+      field: date,
       headerName: date,
       width: 130,
-
-      valueGetter: (params) => {
+      valueGetter: (params = { row: { shares: {} } }) => {
         console.log('value of date:', date)
-
-        console.log('params:', params)
-        if (!params || !params.row) {
-          // console.error('params or params.row is undefined:', params)
+        if (!params.row || !params.row.shares) {
+          console.error('params.row or params.row.shares is undefined:', params)
           return 0
         }
-        const { row } = params
-        const dateShareValue = row.shares && row.shares[date] ? row.shares[date] : 0
+        const { row, field } = params
+        const dateShareValue = row.shares[field] ? row.shares[field] : 0
         return dateShareValue
       },
     })),
