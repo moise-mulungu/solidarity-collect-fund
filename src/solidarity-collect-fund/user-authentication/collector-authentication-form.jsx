@@ -1,21 +1,35 @@
 import React, { useState } from 'react'
-import { FaGoogle, FaGithub } from 'react-icons/fa'
-import { collection, addDoc } from 'firebase/firestore'
-import { createUserWithEmailAndPassword } from 'firebase/auth'
+import { FaGoogle, FaSignInAlt } from 'react-icons/fa'
+import { collection, addDoc, setDoc, doc } from 'firebase/firestore'
+import {
+  createUserWithEmailAndPassword,
+  signInWithPopup,
+  GoogleAuthProvider,
+  signInWithEmailAndPassword,
+} from 'firebase/auth'
 import { auth, db } from '../firebase'
 
 export default function CollectorAuthenticationForm(props) {
-  console.log('props:', props)
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [fullName, setFullName] = useState('')
   const [solidarityName, setSolidarityName] = useState('')
   const [address, setAddress] = useState('')
   const [isAuthenticated, setIsAuthenticated] = useState(false)
+  const [isLoginMode, setIsLoginMode] = useState(true)
 
   const handleSubmit = async (event) => {
     event.preventDefault()
-    console.log('Submitting form with values:', {
+    if (isLoginMode) {
+      handleLogin(event)
+    } else {
+      handleSignup(event)
+    }
+  }
+
+  const handleSignup = async (event) => {
+    event.preventDefault()
+    console.log('Submitting signup form with values:', {
       email,
       password,
       fullName,
@@ -53,26 +67,76 @@ export default function CollectorAuthenticationForm(props) {
       } else {
         console.error('onFormSubmit is not a function', props.onFormSubmit)
       }
-      // props.onFormSubmit()
       setIsAuthenticated(true)
       setEmail('')
       setPassword('')
       setFullName('')
       setSolidarityName('')
       setAddress('')
-      setPassword('')
     } catch (e) {
       console.error('Error during form submission:', e)
       setIsAuthenticated(false)
     }
   }
 
+  const handleLogin = async (event) => {
+    event.preventDefault()
+    console.log('Submitting login form with values:', {
+      email,
+      password,
+    })
+
+    try {
+      const userCredential = await signInWithEmailAndPassword(auth, email, password)
+      const user = userCredential.user
+      console.log('User signed in:', user)
+      setIsAuthenticated(true)
+      if (typeof props.onFormSubmit === 'function') {
+        props.onFormSubmit(true, 'collector', user.uid)
+      } else {
+        console.error('onFormSubmit is not a function', props.onFormSubmit)
+      }
+    } catch (error) {
+      console.error('Error during login:', error)
+      setIsAuthenticated(false)
+    }
+  }
+
+  const handleLoginWithGoogle = async () => {
+    const provider = new GoogleAuthProvider()
+    try {
+      const result = await signInWithPopup(auth, provider)
+      const credential = GoogleAuthProvider.credentialFromResult(result)
+      const token = credential.accessToken
+      const user = result.user
+      console.log('user', user)
+      const userRef = doc(db, 'users', user.uid)
+      await setDoc(userRef, {
+        email: user.email,
+        fullName,
+        solidarityName,
+        address,
+        role: 'collector',
+      })
+    } catch (error) {
+      const errorCode = error.code
+      const errorMessage = error.message
+      const email = error.email
+      const credential = GoogleAuthProvider.credentialFromError(error)
+      console.error('Error during Google sign-in:', error)
+    }
+  }
+
+  const toggleMode = () => {
+    setIsLoginMode((prevMode) => !prevMode)
+  }
+
   return (
     <>
-      <div className="flex min-h-full flex-1 flex-col justify-center py-12 sm:px-6 lg:px-8">
+      {/* <div className="flex min-h-full flex-1 flex-col justify-center py-12 sm:px-6 lg:px-8"> */}
         <div className="sm:mx-auto sm:w-full sm:max-w-md">
           <h2 className="mt-2 text-center text-3xl font-bold leading-9 tracking-tight text-gray-900">
-            Sign in to your account
+            {isLoginMode ? 'Sign in to your account' : 'Sign up for an account'}
           </h2>
         </div>
 
@@ -115,56 +179,63 @@ export default function CollectorAuthenticationForm(props) {
                 </div>
               </div>
 
-              <div>
-                <label htmlFor="fullName" className="block text-sm font-medium text-gray-900">
-                  Full Name
-                </label>
-                <div className="mt-2">
-                  <input
-                    id="fullName"
-                    name="fullName"
-                    type="text"
-                    value={fullName}
-                    onChange={(e) => setFullName(e.target.value)}
-                    required
-                    className="block w-full rounded-md border border-gray-300 py-2 px-3 text-gray-900 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm"
-                  />
-                </div>
-              </div>
+              {!isLoginMode && (
+                <>
+                  <div>
+                    <label htmlFor="fullName" className="block text-sm font-medium text-gray-900">
+                      Full Name
+                    </label>
+                    <div className="mt-2">
+                      <input
+                        id="fullName"
+                        name="fullName"
+                        type="text"
+                        value={fullName}
+                        onChange={(e) => setFullName(e.target.value)}
+                        required
+                        className="block w-full rounded-md border border-gray-300 py-2 px-3 text-gray-900 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm"
+                      />
+                    </div>
+                  </div>
 
-              <div>
-                <label htmlFor="solidarityName" className="block text-sm font-medium text-gray-900">
-                  Solidarity Name
-                </label>
-                <div className="mt-2">
-                  <input
-                    id="solidarityName"
-                    name="solidarityName"
-                    type="text"
-                    value={solidarityName}
-                    onChange={(e) => setSolidarityName(e.target.value)}
-                    required
-                    className="block w-full rounded-md border border-gray-300 py-2 px-3 text-gray-900 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm"
-                  />
-                </div>
-              </div>
+                  <div>
+                    <label
+                      htmlFor="solidarityName"
+                      className="block text-sm font-medium text-gray-900"
+                    >
+                      Solidarity Name
+                    </label>
+                    <div className="mt-2">
+                      <input
+                        id="solidarityName"
+                        name="solidarityName"
+                        type="text"
+                        value={solidarityName}
+                        onChange={(e) => setSolidarityName(e.target.value)}
+                        required
+                        className="block w-full rounded-md border border-gray-300 py-2 px-3 text-gray-900 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm"
+                      />
+                    </div>
+                  </div>
 
-              <div>
-                <label htmlFor="address" className="block text-sm font-medium text-gray-900">
-                  Address
-                </label>
-                <div className="mt-2">
-                  <input
-                    id="address"
-                    name="address"
-                    type="text"
-                    value={address}
-                    onChange={(e) => setAddress(e.target.value)}
-                    required
-                    className="block w-full rounded-md border border-gray-300 py-2 px-3 text-gray-900 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm"
-                  />
-                </div>
-              </div>
+                  <div>
+                    <label htmlFor="address" className="block text-sm font-medium text-gray-900">
+                      Address
+                    </label>
+                    <div className="mt-2">
+                      <input
+                        id="address"
+                        name="address"
+                        type="text"
+                        value={address}
+                        onChange={(e) => setAddress(e.target.value)}
+                        required
+                        className="block w-full rounded-md border border-gray-300 py-2 px-3 text-gray-900 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm"
+                      />
+                    </div>
+                  </div>
+                </>
+              )}
 
               <div className="flex items-center justify-between">
                 <div className="flex items-center">
@@ -191,7 +262,7 @@ export default function CollectorAuthenticationForm(props) {
                   type="submit"
                   className="flex w-full justify-center rounded-md bg-blue-600 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
                 >
-                  Sign in
+                  {isLoginMode ? 'Sign in' : 'Sign up'}
                 </button>
               </div>
             </form>
@@ -208,25 +279,25 @@ export default function CollectorAuthenticationForm(props) {
 
               <div className="mt-6 grid grid-cols-2 gap-4">
                 <button
-                  href="#"
-                  className="flex w-full items-center justify-center gap-2 rounded-md border border-gray-300 bg-white px-4 py-2 text-sm font-semibold text-gray-700 shadow-sm hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+                  onClick={handleLoginWithGoogle}
+                  className="flex w-full items-center justify-center gap-2 rounded-md border border-gray-300 bg-white px-4 py-2 text-sm font-semibold text-blue-500 shadow-sm hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
                 >
                   <FaGoogle className="h-5 w-5 text-red-500" />
                   Google
                 </button>
 
                 <button
-                  href="#"
+                  onClick={toggleMode}
                   className="flex w-full items-center justify-center gap-2 rounded-md border border-gray-300 bg-white px-4 py-2 text-sm font-semibold text-gray-700 shadow-sm hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
                 >
-                  <FaGithub className="h-5 w-5 text-gray-900" />
-                  GitHub
+                  <FaSignInAlt className="h-5 w-5 text-green-500" />
+                  {isLoginMode ? 'Sign up' : 'Login'}
                 </button>
               </div>
             </div>
           </div>
         </div>
-      </div>
+      {/* </div> */}
     </>
   )
 }

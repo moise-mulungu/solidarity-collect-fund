@@ -15,7 +15,7 @@ export default function AdminAuthentication({ onFormSubmit, fetchUserRole }) {
   const [isLogin, setIsLogin] = useState(true)
   const [error, setError] = useState(null)
   const [role, setRole] = useState(null)
-  const [isAuthenticated, setIsAuthenticated] = useState(false) // New state for authentication
+  const [isAuthenticated, setIsAuthenticated] = useState(false)
 
   const auth = getAuth(app)
 
@@ -30,12 +30,12 @@ export default function AdminAuthentication({ onFormSubmit, fetchUserRole }) {
       await setDoc(userRef, {
         email: user.email,
         displayName: user.displayName,
-        role: 'admin', // Assign the role to the user
+        role: 'admin',
       })
-      const userRole = await fetchUserRole(user.uid) // Fetch the user's role
-      setRole(userRole) // Set the role in the state
-      setIsAuthenticated(true) // Set isAuthenticated to true after successful login
-      onFormSubmit(true, 'admin') // Add this line
+      const userRole = await fetchUserRole(user.uid)
+      setRole(userRole)
+      setIsAuthenticated(true)
+      onFormSubmit(true, 'admin')
     } catch (error) {
       console.error(`Error code: ${error.code}, Error message: ${error.message}`)
     }
@@ -52,11 +52,11 @@ export default function AdminAuthentication({ onFormSubmit, fetchUserRole }) {
       await setDoc(userRef, {
         email: user.email,
         displayName: user.displayName,
-        role: 'admin', // Assign the role to the user
+        role: 'admin',
       })
-      const userRole = await fetchUserRole(user.uid) // Fetch the user's role
-      setRole(userRole) // Set the role in the state
-      onFormSubmit(true, 'admin') // Add this line
+      const userRole = await fetchUserRole(user.uid)
+      setRole(userRole)
+      onFormSubmit(true, 'admin')
     } catch (error) {
       console.error(`Error code: ${error.code}, Error message: ${error.message}`)
     }
@@ -66,31 +66,21 @@ export default function AdminAuthentication({ onFormSubmit, fetchUserRole }) {
     const provider = new GoogleAuthProvider()
     signInWithPopup(auth, provider)
       .then(async (result) => {
-        // This gives you a Google Access Token. You can use it to access the Google API.
         const credential = GoogleAuthProvider.credentialFromResult(result)
         const token = credential.accessToken
-        // The signed-in user info.
         const user = result.user
-        console.log('user', user) // Log the user object
         const userRef = doc(db, 'users', user.uid)
         await setDoc(userRef, {
           email: user.email,
           displayName: user.displayName,
-          role: 'admin', // Assign the role to the user
+          role: 'admin',
         })
-        const userRole = await fetchUserRole(user.uid) // Fetch the user's role
-        setRole(userRole) // Set the role in the state
-        onFormSubmit(true)
+        const userRole = await fetchUserRole(user.uid)
+        setRole(userRole)
+        onFormSubmit(true, 'admin')
       })
       .catch((error) => {
-        // Handle Errors here.
-        const errorCode = error.code
-        const errorMessage = error.message
-        // The email of the user's account used.
-        const email = error.email
-        // The AuthCredential type that was used.
-        const credential = GoogleAuthProvider.credentialFromError(error)
-        // ...
+        console.error(`Error code: ${error.code}, Error message: ${error.message}`)
       })
   }
 
@@ -98,30 +88,27 @@ export default function AdminAuthentication({ onFormSubmit, fetchUserRole }) {
     setIsLogin(!isLogin)
   }
 
-  const handleRoleSwitch = (newRole) => {
-    setRole(newRole)
-    setIsLogin(true) // Reset the login/signup state
-  }
-
   return (
-    <div>
-      {isLogin ? (
-        <Login
-          handleLogin={handleLogin}
-          handleSignup={handleSignup}
-          error={error}
-          toggleAuthenticationMode={toggleAuthenticationMode}
-          handleLoginWithGoogle={handleLoginWithGoogle}
-          className="p-10 bg-white flex flex-col items-start pb-5 w-72"
-        />
-      ) : (
-        <Signup
-          handleSignup={handleSignup}
-          error={error}
-          toggleAuthenticationMode={toggleAuthenticationMode}
-          className="p-10 bg-white flex flex-col items-start pb-5 w-72"
-        />
-      )}
+    <div className="w-full h-full flex items-center justify-center">
+      <div className="bg-white p-10 rounded shadow-md w-full max-w-md">
+        {isLogin ? (
+          <Login
+            handleLogin={handleLogin}
+            handleSignup={handleSignup}
+            error={error}
+            toggleAuthenticationMode={toggleAuthenticationMode}
+            handleLoginWithGoogle={handleLoginWithGoogle}
+            className="w-full"
+          />
+        ) : (
+          <Signup
+            handleSignup={handleSignup}
+            error={error}
+            toggleAuthenticationMode={toggleAuthenticationMode}
+            className="w-full"
+          />
+        )}
+      </div>
     </div>
   )
 }

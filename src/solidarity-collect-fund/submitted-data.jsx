@@ -44,22 +44,24 @@ const SubmittedData = () => {
     console.log('fetchMeetingsData called with:', solidarityName) // Log the value of solidarityName
     if (!solidarityName) return // Guard clause to prevent querying with an undefined solidarityName
 
-    setMeetingsLoading(true)
     try {
       const meetingsRef = collection(db, 'meetings')
       const q = query(meetingsRef, where('solidarityName', '==', solidarityName))
       const querySnapshot = await getDocs(q)
       console.log('querySnapshot:', querySnapshot) // Log the querySnapshot
-      const data = querySnapshot.docs.map((doc) => {
+      const data = querySnapshot.docs.flatMap((doc) => {
         const docData = doc.data()
         console.log('doc data:', docData) // Log the data of each document
-        return {
+        return docData.rows.map((row, index) => ({
           id: doc.id, // Assuming each document has a unique id
-          memberNames: docData.memberNames,
-          share: docData.share,
-          joinDate: new Date(docData.joinDate).toLocaleDateString(), // Assuming joinDate is an ISO string
-        }
+          number: index + 1, // Add a 'number' field to each object
+          memberNames: Array.isArray(row.memberNames) ? row.memberNames : [row.memberNames],
+          share: row.share,
+          joinDate: row.joinDate ? new Date(row.joinDate).toLocaleDateString() : 'N/A', // Handle invalid joinDate
+        }))
       })
+
+      // setMeetingsLoading(data)
       console.log('data:', data) // Log the processed data
       setMeetingsData(data)
       setMeetingsLoading(false)
@@ -88,11 +90,51 @@ const SubmittedData = () => {
     }
   }
 
+  const transformData = (data) => {
+    const dates = [...new Set(data.map((item) => item.joinDate))].sort(
+      (a, b) => new Date(a) - new Date(b)
+    )
+    const rows = data.reduce((acc, item) => {
+      const member = item.memberNames
+      if (!acc[member]) {
+        acc[member] = { id: Object.keys(acc).length + 1, memberName: member[0], shares: {} }
+      }
+      if (typeof item.share === 'number') {
+        acc[member].shares[`date_${item.joinDate}`] = item.share
+      }
+      return acc
+    }, {})
+
+    console.log('Transformed Data:', { dates, rows: Object.values(rows) }) // Log the transformed data
+    return { dates, rows: Object.values(rows) }
+  }
+
+  const { dates, rows } = transformData(meetingsData)
+
+  console.log('dates:', dates)
+  console.log('rows:', rows)
   const columns = [
-    { field: 'id', headerName: 'ID', width: 70 },
-    { field: 'memberNames', headerName: 'Member Names', width: 200 },
-    { field: 'share', headerName: 'Share', width: 130 },
-    { field: 'joinDate', headerName: 'Join Date', width: 130 },
+    { field: 'id', headerName: 'N°', width: 70 },
+    { field: 'memberName', headerName: 'MemberNames', width: 200 },
+    ...dates.map((date) => ({
+      // field: date,
+      field: `date_${date}`,
+      headerName: date,
+      width: 130,
+
+      valueGetter: (params) => {
+        console.log('value of date:', date)
+
+        console.log('params:', params)
+        if (!params || !params.row) {
+          // console.error('params or params.row is undefined:', params)
+          return 0
+        }
+        const { row } = params
+        const dateShareValue = row.shares && row.shares[date] ? row.shares[date] : 0
+        return dateShareValue
+      },
+    })),
   ]
 
   if (loading) {
@@ -160,13 +202,7 @@ const SubmittedData = () => {
             </div>
           ) : (
             <div style={{ height: 400, width: '100%' }}>
-              <DataGrid
-                rows={meetingsData}
-                columns={columns}
-                pageSize={5}
-                rowsPerPageOptions={[5]}
-                checkboxSelection
-              />
+              <DataGrid rows={rows} columns={columns} pageSize={5} rowsPerPageOptions={[5]} />
             </div>
           )}
         </div>
