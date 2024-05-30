@@ -1,9 +1,10 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import Header from './header'
 import UserAuthentication from './user-authentication'
 import WeeklyMeetingForm from './weekly-meeting-form'
 import CollectorAuthenticationForm from './user-authentication/collector-authentication-form'
 import SubmittedData from './submitted-data'
+import { DNA } from 'react-loader-spinner'
 
 export default function SolidarityCollectFund() {
   const [isAuthenticated, setIsAuthenticated] = useState(false)
@@ -11,6 +12,14 @@ export default function SolidarityCollectFund() {
   const [isAdminAuthenticated, setIsAdminAuthenticated] = useState(false)
   const [selectedAuthType, setSelectedAuthType] = useState(null)
   const [collectorUid, setCollectorUid] = useState('')
+  const [isLoading, setIsLoading] = useState(true)
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setIsLoading(false)
+    }, 5000)
+    return () => clearTimeout(timer)
+  }, [isLoading])
 
   const handleAdminAuthentication = (authStatus, userRole) => {
     setIsAuthenticated(authStatus)
@@ -31,6 +40,22 @@ export default function SolidarityCollectFund() {
 
   const handleCollectorClick = () => {
     setSelectedAuthType('collector')
+  }
+
+  if (isLoading) {
+    return (
+      <div className="min-h-screen flex flex-col items-center justify-center">
+        <h1 style={{ fontSize: '3em' }}>Welcome to Solidarity Collect Fund</h1>
+        <DNA
+          visible={true}
+          height="160"
+          width="160"
+          ariaLabel="dna-loading"
+          wrapperStyle={{}}
+          wrapperClass="dna-wrapper"
+        />
+      </div>
+    )
   }
 
   return (
@@ -67,13 +92,13 @@ export default function SolidarityCollectFund() {
         )}
 
         {isAdminAuthenticated && (
-          <div className="w-full max-w-4xl">
+          <div className="w-full">
             <SubmittedData />
           </div>
         )}
 
         {isCollectorAuthenticated && (
-          <div className="w-full max-w-4xl">
+          <div className="w-full">
             <WeeklyMeetingForm collectorUid={collectorUid} />
           </div>
         )}
