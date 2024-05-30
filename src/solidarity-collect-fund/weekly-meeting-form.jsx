@@ -14,7 +14,11 @@ import {
   GridActionsCellItem,
   GridRowModes,
   GridRowEditStopReasons,
+  // getGridNumericColumnOperators,
 } from '@mui/x-data-grid'
+
+import { createTheme, ThemeProvider } from '@mui/material/styles'
+import { isEqual } from 'lodash'
 
 // Function to generate a random trader name
 const randomTraderName = () => {
@@ -44,6 +48,28 @@ const initialRows = [
 const EditToolbar = ({ footerRowsRef, collectorUid, ...props }) => {
   const { setRows, setRowModesModel, setSubmittedData, rows } = props
   const [newRowId, setNewRowId] = React.useState(null)
+  const [amountValue, setAmountValue] = React.useState(0)
+  const [calculationAmountValue, setCalculationAmountValue] = React.useState(0)
+
+  // Update amountValue and set calculationAmountValue
+  const handleAmountValueChange = (e) => {
+    const newValue = Number(e.target.value)
+    setAmountValue(newValue)
+    setCalculationAmountValue(newValue)
+  }
+
+  React.useEffect(() => {
+    if (calculationAmountValue !== 0) {
+      const newRows = rows.map((row) => ({
+        ...row,
+        amount: row.share * calculationAmountValue,
+      }))
+
+      if (!isEqual(rows, newRows)) {
+        setRows(newRows)
+      }
+    }
+  }, [calculationAmountValue, rows, setRows])
 
   const handleClick = () => {
     const id = randomId()
@@ -116,7 +142,7 @@ const EditToolbar = ({ footerRowsRef, collectorUid, ...props }) => {
         id: row.id, // Use existing ID
         memberNames: row.memberNames,
         share: row.share,
-        amount: row.amount,
+        amount: row.amount, // Update the amount field here
         solidarity: row.solidarity,
         age: row.age,
         assistantFund: row.assistantFund,
@@ -162,6 +188,15 @@ const EditToolbar = ({ footerRowsRef, collectorUid, ...props }) => {
       >
         Submit
       </Button>
+      <label className="flex items-center text-sm font-medium text-gray-700">
+        <span className="mr-2">Amount value</span>
+        <input
+          type="number"
+          value={amountValue}
+          onChange={handleAmountValueChange}
+          className="mt-1 flex-grow py-2 px-3 border border-gray-300 bg-white rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
+        />
+      </label>
     </GridToolbarContainer>
   )
 }
@@ -299,6 +334,7 @@ export default function WeeklyMeetingForm({ collectorUid }) {
       editable: true,
       // valueGetter: (params) => new Date(params.value),
       valueGetter: (params) => {
+        console.log('params of the weekly meeting:', params)
         // Check if the 'value' property exists and is not undefined in the params object
         if (params && params.value !== undefined) {
           // If it exists and is not undefined, return the value as a Date object
@@ -363,19 +399,6 @@ export default function WeeklyMeetingForm({ collectorUid }) {
         ]
       },
     },
-  ]
-
-  const submittedColumns = [
-    { field: 'memberNames', headerName: 'Member Names' },
-    { field: 'share', headerName: 'Share' },
-    { field: 'amount', headerName: 'Amount' },
-    { field: 'solidarity', headerName: 'Solidarity' },
-    { field: 'age', headerName: 'Age' },
-    { field: 'assistantFund', headerName: 'Assistant Fund' },
-    { field: 'assistantAmount', headerName: 'Assistant Amount' },
-    { field: 'fine', headerName: 'Fine' },
-    { field: 'joinDate', headerName: 'Join date' },
-    { field: 'role', headerName: 'Observation' },
   ]
 
   React.useEffect(() => {
@@ -492,6 +515,24 @@ export default function WeeklyMeetingForm({ collectorUid }) {
     }
   }, [submittedData])
 
+  const theme = createTheme({
+    components: {
+      MuiDataGrid: {
+        styleOverrides: {
+          root: {
+            '& .MuiDataGrid-cell': {
+              borderRight: '1px solid rgba(224, 224, 224,1)',
+              textAlign: 'center',
+            },
+            '& .MuiDataGrid-columnHeader': {
+              textAlign: 'center',
+            },
+          },
+        },
+      },
+    },
+  })
+
   return (
     <Box
       sx={{
@@ -506,39 +547,46 @@ export default function WeeklyMeetingForm({ collectorUid }) {
       }}
     >
       {gridRows.length > 0 && (
-        <DataGrid
-          rows={gridRows}
-          // rows={rowsWithFooter}
-          columns={columns}
-          editMode="row"
-          rowModesModel={rowModesModel}
-          onRowModesModelChange={handleRowModesModelChange}
-          onRowEditStop={handleRowEditStop}
-          processRowUpdate={processRowUpdate}
-          slots={{
-            toolbar: (props) => (
-              <EditToolbar
-                {...props}
-                rows={rows}
-                footerRowsRef={footerRowsRef}
-                setSubmittedData={setSubmittedData}
-                collectorUid={collectorUid}
-                // rowModesModel={rowModesModel}
-                // setRowModesModel={setRowModesModel}
-              />
-            ),
-          }}
-          slotProps={{
-            toolbar: { setRows, setRowModesModel, submittedData, setSubmittedData, collectorUid },
-          }}
-        />
+        <ThemeProvider theme={theme}>
+          <DataGrid
+            rows={gridRows}
+            columns={columns}
+            editMode="row"
+            rowModesModel={rowModesModel}
+            onRowModesModelChange={handleRowModesModelChange}
+            onRowEditStop={handleRowEditStop}
+            processRowUpdate={processRowUpdate}
+            slots={{
+              toolbar: (props) => (
+                <EditToolbar
+                  {...props}
+                  rows={rows}
+                  footerRowsRef={footerRowsRef}
+                  setSubmittedData={setSubmittedData}
+                  collectorUid={collectorUid}
+                />
+              ),
+            }}
+            slotProps={{
+              toolbar: { setRows, setRowModesModel, submittedData, setSubmittedData, collectorUid },
+            }}
+          />
+        </ThemeProvider>
       )}
 
-      {submittedData && submittedData.length > 0 && (
-        <div style={{ height: 400, width: '100%' }}>
-          <DataGrid rows={submittedData} columns={columns} pageSize={5} />
+      {/* {submittedData && submittedData.length > 0 && (
+        <div style={{ height: 'auto', width: '100%', display: 'flex' }}>
+          <ThemeProvider theme={theme}>
+            <DataGrid
+              autoHeight
+              rows={rows}
+              columns={columns}
+              pageSize={5}
+              rowsPerPageOptions={[5]}
+            />
+          </ThemeProvider>
         </div>
-      )}
+      )} */}
     </Box>
   )
 }
